@@ -64,9 +64,13 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
  */
 const hitSound = new Audio('/sounds/hit.mp3')
 
-const playHitSound = () => {
-    hitSound.currentTime = 0
-    hitSound.play()
+const playHitSound = (collision) => {
+    const impactStrength = collision.contact.getImpactVelocityAlongNormal()
+
+    if (impactStrength > 1) {
+        hitSound.currentTime = 0
+        hitSound.play()
+    }
 }
 
 
@@ -228,8 +232,17 @@ debugObject.createBox = () => {
         }
     )
 }
+debugObject.reset = () => {
+    for (const object of objectsToUpdate) {
+        object.body.removeEventListener('collide', playHitSound)
+        world.removeBody(object.body)
+        scene.remove(object.mesh)
+    }
+    objectsToUpdate.length = 0
+}
 gui.add(debugObject, 'createSphere')
 gui.add(debugObject, 'createBox')
+gui.add(debugObject, 'reset')
 
 /**
  * Animate
