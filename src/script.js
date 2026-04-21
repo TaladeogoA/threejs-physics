@@ -58,29 +58,16 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.setSize(sizes.width, sizes.height)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
+
 /**
- * Physics
+ * Sounds
  */
-const objectsToUpdate = []
+const hitSound = new Audio('/sounds/hit.mp3')
 
-// World
-const world = new CANNON.World()
-world.gravity.set(0, -9.82, 0)
-
-// Materials
-const defaultMaterial = new CANNON.Material('default')
-
-const defaultContactMaterial = new CANNON.ContactMaterial(
-    defaultMaterial,
-    defaultMaterial,
-    {
-        friction: 0.3,
-        restitution: 0.7
-    }
-)
-world.addContactMaterial(defaultContactMaterial)
-world.defaultContactMaterial = defaultContactMaterial
-
+const playHitSound = () => {
+    hitSound.currentTime = 0
+    hitSound.play()
+}
 
 
 /**
@@ -97,13 +84,42 @@ const environmentMapTexture = cubeTextureLoader.load([
     '/textures/environmentMaps/0/pz.png',
     '/textures/environmentMaps/0/nz.png'
 ])
-const sphereGeometry = new THREE.SphereGeometry(1, 20, 20)
+
+
+/**
+ * Physics
+ */
+const objectsToUpdate = []
+
+// World
+const world = new CANNON.World()
+world.gravity.set(0, -9.82, 0)
+world.broadphase = new CANNON.SAPBroadphase(world)
+world.allowSleep = true
+
+// Materials
+const defaultMaterial = new CANNON.Material('default')
+
+const defaultContactMaterial = new CANNON.ContactMaterial(
+    defaultMaterial,
+    defaultMaterial,
+    {
+        friction: 0.3,
+        restitution: 0.7
+    }
+)
+world.addContactMaterial(defaultContactMaterial)
+world.defaultContactMaterial = defaultContactMaterial
+
 const standardMaterial = new THREE.MeshStandardMaterial({
     metalness: 0.3,
     roughness: 0.4,
     envMap: environmentMapTexture,
     envMapIntensity: 0.5
 })
+
+// Geometries
+const sphereGeometry = new THREE.SphereGeometry(1, 20, 20)
 const boxGeometry = new THREE.BoxGeometry(2, 2, 2)
 
 /**
@@ -117,7 +133,8 @@ const addSphere = (radius, position) => {
         position,
         scene,
         defaultMaterial,
-        world
+        world,
+        playHitSound
     )
     objectsToUpdate.push(object)
 }
@@ -130,7 +147,8 @@ const addBox = (size, position) => {
         position,
         scene,
         defaultMaterial,
-        world
+        world,
+        playHitSound
     )
     objectsToUpdate.push(object)
 }
@@ -183,9 +201,7 @@ scene.add(directionalLight)
  * Initial Content
  */
 addSphere(0.5, { x: 0, y: 3, z: 0 })
-objectsToUpdate.push(
-    createBox(boxGeometry, standardMaterial, 1, { x: 2, y: 5, z: 0 }, scene, defaultMaterial, world)
-)
+addBox(0.5, { x: 2, y: 5, z: 0 })
 
 /**
  * Debug
@@ -233,6 +249,7 @@ const tick = () => {
     world.step(1 / 60, deltaTime, 3)
     for (const object of objectsToUpdate) {
         object.mesh.position.copy(object.body.position)
+        object.mesh.quaternion.copy(object.body.quaternion)
     }
 
     // Update controls

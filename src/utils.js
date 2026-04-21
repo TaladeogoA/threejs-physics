@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import CANNON from 'cannon'
 
-export const createSphere = (sphereGeometry, sphereMaterial, radius, position, scene, material, world) => {
+export const createSphere = (sphereGeometry, sphereMaterial, radius, position, scene, material, world, playHitSound) => {
     // Three.js mesh
     const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial)
     mesh.scale.set(radius, radius, radius)
@@ -17,12 +17,13 @@ export const createSphere = (sphereGeometry, sphereMaterial, radius, position, s
         material
     })
     body.position.copy(position)
+    body.addEventListener('collide', playHitSound)
     world.addBody(body)
 
     return { mesh, body }
 }
 
-export const createBox = (boxGeometry, boxMaterial, size, position, scene, material, world) => {
+export const createBox = (boxGeometry, boxMaterial, size, position, scene, material, world, playHitSound) => {
     // Three.js mesh
     const mesh = new THREE.Mesh(boxGeometry, boxMaterial)
     mesh.scale.set(size, size, size)
@@ -38,6 +39,7 @@ export const createBox = (boxGeometry, boxMaterial, size, position, scene, mater
         material
     })
     body.position.copy(position)
+    body.addEventListener('collide', playHitSound)
     world.addBody(body)
 
     return { mesh, body }
