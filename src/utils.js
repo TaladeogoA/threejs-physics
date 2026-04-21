@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import CANNON from 'cannon'
+import * as CANNON from 'cannon-es'
 
 export const createSphere = (sphereGeometry, sphereMaterial, radius, position, scene, material, world, playHitSound) => {
     // Three.js mesh
