@@ -1,0 +1,248 @@
+import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import GUI from 'lil-gui'
+import CANNON from 'cannon'
+import { createSphere, createBox } from './utils.js'
+
+/**
+ * Base
+ */
+// Canvas
+const canvas = document.querySelector('canvas.webgl')
+
+// Scene
+const scene = new THREE.Scene()
+
+/**
+ * Sizes
+ */
+const sizes = {
+    width: window.innerWidth,
+    height: window.innerHeight
+}
+
+window.addEventListener('resize', () => {
+    // Update sizes
+    sizes.width = window.innerWidth
+    sizes.height = window.innerHeight
+
+    // Update camera
+    camera.aspect = sizes.width / sizes.height
+    camera.updateProjectionMatrix()
+
+    // Update renderer
+    renderer.setSize(sizes.width, sizes.height)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+})
+
+/**
+ * Camera
+ */
+// Base camera
+const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100)
+camera.position.set(- 3, 3, 3)
+scene.add(camera)
+
+// Controls
+const controls = new OrbitControls(camera, canvas)
+controls.enableDamping = true
+
+/**
+ * Renderer
+ */
+const renderer = new THREE.WebGLRenderer({
+    canvas: canvas
+})
+renderer.shadowMap.enabled = true
+renderer.shadowMap.type = THREE.PCFSoftShadowMap
+renderer.setSize(sizes.width, sizes.height)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+
+/**
+ * Physics
+ */
+const objectsToUpdate = []
+
+// World
+const world = new CANNON.World()
+world.gravity.set(0, -9.82, 0)
+
+// Materials
+const defaultMaterial = new CANNON.Material('default')
+
+const defaultContactMaterial = new CANNON.ContactMaterial(
+    defaultMaterial,
+    defaultMaterial,
+    {
+        friction: 0.3,
+        restitution: 0.7
+    }
+)
+world.addContactMaterial(defaultContactMaterial)
+world.defaultContactMaterial = defaultContactMaterial
+
+
+
+/**
+ * Textures
+ */
+const textureLoader = new THREE.TextureLoader()
+const cubeTextureLoader = new THREE.CubeTextureLoader()
+
+const environmentMapTexture = cubeTextureLoader.load([
+    '/textures/environmentMaps/0/px.png',
+    '/textures/environmentMaps/0/nx.png',
+    '/textures/environmentMaps/0/py.png',
+    '/textures/environmentMaps/0/ny.png',
+    '/textures/environmentMaps/0/pz.png',
+    '/textures/environmentMaps/0/nz.png'
+])
+const sphereGeometry = new THREE.SphereGeometry(1, 20, 20)
+const standardMaterial = new THREE.MeshStandardMaterial({
+    metalness: 0.3,
+    roughness: 0.4,
+    envMap: environmentMapTexture,
+    envMapIntensity: 0.5
+})
+const boxGeometry = new THREE.BoxGeometry(2, 2, 2)
+
+/**
+ * Utilities
+ */
+const addSphere = (radius, position) => {
+    const object = createSphere(
+        sphereGeometry,
+        standardMaterial,
+        radius,
+        position,
+        scene,
+        defaultMaterial,
+        world
+    )
+    objectsToUpdate.push(object)
+}
+
+const addBox = (size, position) => {
+    const object = createBox(
+        boxGeometry,
+        standardMaterial,
+        size,
+        position,
+        scene,
+        defaultMaterial,
+        world
+    )
+    objectsToUpdate.push(object)
+}
+
+/**
+ * Floor
+ */
+const floorShape = new CANNON.Plane()
+const floorBody = new CANNON.Body()
+floorBody.mass = 0
+floorBody.addShape(floorShape)
+floorBody.quaternion.setFromAxisAngle(
+    new CANNON.Vec3(-1, 0, 0),
+    Math.PI * 0.5
+)
+world.addBody(floorBody)
+
+const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshStandardMaterial({
+        color: '#777777',
+        metalness: 0.3,
+        roughness: 0.4,
+        envMap: environmentMapTexture,
+        envMapIntensity: 0.5
+    })
+)
+floor.receiveShadow = true
+floor.rotation.x = - Math.PI * 0.5
+scene.add(floor)
+
+/**
+ * Lights
+ */
+const ambientLight = new THREE.AmbientLight(0xffffff, 2.1)
+scene.add(ambientLight)
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6)
+directionalLight.castShadow = true
+directionalLight.shadow.mapSize.set(1024, 1024)
+directionalLight.shadow.camera.far = 15
+directionalLight.shadow.camera.left = - 7
+directionalLight.shadow.camera.top = 7
+directionalLight.shadow.camera.right = 7
+directionalLight.shadow.camera.bottom = - 7
+directionalLight.position.set(5, 5, 5)
+scene.add(directionalLight)
+
+/**
+ * Initial Content
+ */
+addSphere(0.5, { x: 0, y: 3, z: 0 })
+objectsToUpdate.push(
+    createBox(boxGeometry, standardMaterial, 1, { x: 2, y: 5, z: 0 }, scene, defaultMaterial, world)
+)
+
+/**
+ * Debug
+ */
+const gui = new GUI()
+const debugObject = {}
+debugObject.createSphere = () => {
+    addSphere(
+        0.5,
+        {
+            x: (Math.random() - 0.5) * 10,
+            y: 3,
+            z: (Math.random() - 0.5) * 10
+        }
+    )
+}
+debugObject.createBox = () => {
+    addBox(
+        0.5,
+        {
+            x: (Math.random() - 0.5) * 10,
+            y: 3,
+            z: (Math.random() - 0.5) * 10
+        }
+    )
+}
+gui.add(debugObject, 'createSphere')
+gui.add(debugObject, 'createBox')
+
+/**
+ * Animate
+ */
+const clock = new THREE.Clock()
+let previousTime = 0
+
+const tick = () => {
+    const elapsedTime = clock.getElapsedTime()
+    let deltaTime = elapsedTime - previousTime
+    previousTime = elapsedTime
+
+    // Cap deltaTime to avoid massive physics jumps
+    deltaTime = Math.min(deltaTime, 0.1)
+
+    // Update physics
+    world.step(1 / 60, deltaTime, 3)
+    for (const object of objectsToUpdate) {
+        object.mesh.position.copy(object.body.position)
+    }
+
+    // Update controls
+    controls.update()
+
+    // Render
+    renderer.render(scene, camera)
+
+    // Call tick again on the next frame
+    window.requestAnimationFrame(tick)
+}
+
+tick()
